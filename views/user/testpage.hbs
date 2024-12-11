@@ -1,0 +1,124 @@
+<head>
+    <style>
+        .nav_here {
+            font-size: 20px;
+            font-weight: 500;
+            background: black;
+            color: white;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 50px;
+        }
+
+        .up_sec {
+            width: 70%;
+        }
+
+        .up_btn {
+            color: white;
+            background-color: black;
+            font-weight: bold;
+            border: none;
+            padding: 7px 12px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            margin-top: 15px;
+            width: fit-content;
+        }
+
+        .up_btn:hover {
+            background-color: white;
+            color: black;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-light nav_here">
+        <div>FACE UNLOCK</div>
+    </nav>
+
+    <section class="container up_sec">
+        <!-- Canvas for webcam video -->
+        <video id="video" autoplay></video>
+        <canvas id="canvas" style="display: none;"></canvas>
+        
+        <div id="result" style="margin-top: 20px; font-size: 18px; font-weight: bold; display: none;">
+            <span id="celebrity_name"></span>
+        </div>
+
+        <div>
+            <a href="/enroll_face" class="btn up_btn">ENROLL</a>
+        </div>
+    </section>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const resultDiv = document.getElementById('result');
+        const celebrityNameSpan = document.getElementById('celebrity_name');
+
+        let isProcessing = false; // This flag ensures only one request is processed at a time
+
+        // Load the webcam video stream
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+            })
+            .catch((err) => {
+                console.error('Error accessing the camera:', err);
+            });
+
+        // Function to capture face and send to the server
+        const detectFaceAndSend = async () => {
+            if (isProcessing) return; // Prevent sending new image if one is already being processed
+
+            isProcessing = true; // Mark that we are processing a request
+
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            // Draw the current frame onto the canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Extract the image as base64
+            const imageDataURL = canvas.toDataURL('image/jpeg');
+
+            try {
+                // Send the base64 image to the server
+                const response = await fetch('/find_face', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageDataURL }),
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.style.display = 'block';
+                    if (data.prediction == "1") {
+                        window.location.href = '/home_page'; // Redirect to /home_page
+                    } else {
+                        celebrityNameSpan.textContent = "TRY AGAIN";
+                    }
+                } else {
+                    console.error('Face detection failed');
+                }
+            } catch (err) {
+                console.error('Error sending face to the server:', err);
+            } finally {
+                isProcessing = false; // Reset flag after processing
+            }
+        };
+
+        // Function to start sending images at a 1-second interval
+        const startCapturing = () => {
+            setInterval(detectFaceAndSend, 1000); // Will run every 1 second, but only if the previous request is done
+        };
+
+        // Start capturing once everything is ready
+        startCapturing();
+    </script>
+</body>

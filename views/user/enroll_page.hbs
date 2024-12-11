@@ -1,0 +1,126 @@
+<head>
+    <style>
+        .nav_here {
+            font-size: 20px;
+            font-weight: 500;
+            background: black;
+            color: white;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 50px;
+        }
+
+        .up_sec {
+            width: 70%;
+        }
+
+        .up_btn {
+            color: white;
+            background-color: black;
+            font-weight: bold;
+            border: none;
+            padding: 7px 12px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            margin-top: 15px;
+            width: fit-content;
+        }
+
+        .up_btn:hover {
+            background-color: white;
+            color: black;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-light nav_here">
+        <div>ENROLL FACE</div>
+    </nav>
+
+    <section class="container up_sec">
+        <!-- Canvas for webcam video -->
+        <video id="video" autoplay></video>
+        <canvas id="canvas" style="display: none;"></canvas>
+
+        <div>
+            <button class="btn up_btn" id="capture-btn">Capture</button>
+        </div>
+    </section>
+
+    <script>
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const captureBtn = document.getElementById('capture-btn');
+
+  let captureInterval;
+
+  navigator.mediaDevices.getUserMedia({ video: true })
+      .then((stream) => {
+          video.srcObject = stream;
+      })
+      .catch((err) => {
+          console.error('Error accessing the camera:', err);
+      });
+
+  const captureImageAndSend = async () => {
+      const context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageDataURL = canvas.toDataURL('image/jpeg');
+
+      try {
+          const response = await fetch('/save_enrolled_image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: imageDataURL }),
+          });
+
+          if (!response.ok) {
+              console.error('Failed to save image');
+          }
+      } catch (err) {
+          console.error('Error sending face to the server:', err);
+      }
+  };
+
+  const startCapturing = () => {
+      const endTime = Date.now() + 3000; // Capture for 3 seconds
+      captureInterval = setInterval(() => {
+          if (Date.now() >= endTime) {
+              clearInterval(captureInterval);
+              processImages(); // Call processImages after capturing ends
+          } else {
+              captureImageAndSend();
+          }
+      }, 90);
+  };
+
+  const processImages = async () => {
+      try {
+          const response = await fetch('/process_images', {
+              method: 'POST',
+          });
+
+          if (response.ok) {
+              alert('face enrolled successfully!');
+              window.location.href = '/'; // Redirect to homepage
+          } else {
+              alert('Error in training the model. Please try again.');
+          }
+      } catch (err) {
+          console.error('Error in processing images:', err);
+          alert('Something went wrong. Please try again.');
+      }
+  };
+
+  captureBtn.addEventListener('click', () => {
+      startCapturing();
+  });
+</script>
+
+</body>
